@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeployPilot - Cloud Operations & DevOps Dashboard</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="DeployPilot is a production-grade cloud operations dashboard showing system metrics, deployment pipelines, interactive architecture nodes, and live logs.">
+  <meta name="keywords" content="AWS, DevOps, EC2, Express, Node.js, CI/CD, GitHub Actions, CloudWatch, S3, Performance, Load Testing">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-theme">
+
+  <!-- Dashboard Container -->
+  <div class="dashboard-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="dashboard-sidebar">
+      <div class="sidebar-brand">
+        <i data-lucide="cpu" class="logo-icon"></i>
+        <span class="logo-text">Deploy<span class="text-accent">Pilot</span></span>
+      </div>
+      <div class="sidebar-env">
+        <div class="env-dot"></div>
+        <span class="env-text">Production VPC</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#overview" class="sidebar-link active">
+          <i data-lucide="layout-dashboard"></i> <span>System Overview</span>
+        </a>
+        <a href="#metrics" class="sidebar-link">
+          <i data-lucide="activity"></i> <span>System Metrics</span>
+        </a>
+        <a href="#infrastructure" class="sidebar-link">
+          <i data-lucide="network"></i> <span>Infrastructure</span>
+        </a>
+        <a href="#deployments" class="sidebar-link">
+          <i data-lucide="history"></i> <span>Deployments</span>
+        </a>
+        <a href="#logs" class="sidebar-link">
+          <i data-lucide="terminal"></i> <span>Live Logs</span>
+        </a>
+        <a href="#api-tester" class="sidebar-link">
+          <i data-lucide="play-circle"></i> <span>API Tester</span>
+        </a>
+        <a href="#security" class="sidebar-link">
+          <i data-lucide="shield-check"></i> <span>Security</span>
+        </a>
+        <a href="#load-tests" class="sidebar-link">
+          <i data-lucide="gauge"></i> <span>Load Tests</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="meta-label">Node:</span> <span class="meta-val font-mono" id="aside-node">v20.11.0</span>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="dashboard-main">
+      
+      <!-- Top Control Bar -->
+      <header class="dashboard-topbar">
+        <div class="topbar-breadcrumbs">
+          <span class="crumb-parent">DeployPilot</span>
+          <span class="crumb-separator">/</span>
+          <span class="crumb-active">Operations Dashboard</span>
+        </div>
+        <div class="topbar-actions">
+          <div class="monitoring-summary">
+            <span class="status-summary-dot"></span>
+            <span class="status-summary-text">All Systems Operational</span>
+          </div>
+          <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="btn btn-icon" title="View Repository">
+            <i data-lucide="github"></i>
+          </a>
+        </div>
+      </header>
+
+      <!-- Scrollable content window -->
+      <div class="dashboard-viewport">
+        
+        <!-- Section: Overview -->
+        <section id="overview" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">System Overview</h2>
+              <p class="viewport-section-subtitle">Real-time indicators showing core machine diagnostics and deployment metrics.</p>
+            </div>
+            <div class="live-pill">
+              <span class="pulse-dot"></span>
+              Live Feed
+            </div>
+          </div>
+
+          <!-- 8 Statistics Cards -->
+          <div class="stat-grid-8">
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Application Status</span>
+              <div class="stat-val-container">
+                <span class="pulse-dot green-pulse"></span>
+                <span class="stat-val text-green font-semibold">Online</span>
+              </div>
+              <p class="stat-desc">Reverse proxy routing OK</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Server Uptime</span>
+              <div class="stat-val font-mono" id="uptime-val">0h 0m 0s</div>
+              <p class="stat-desc">Process active state duration</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Deployment Version</span>
+              <div class="stat-val font-mono text-accent" id="version-val">v1.0.0</div>
+              <p class="stat-desc">Current production branch tag</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Environment</span>
+              <div class="stat-val text-capitalize" id="env-val">production</div>
+              <p class="stat-desc">AWS deployment environment</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Build Number</span>
+              <div class="stat-val font-mono" id="build-val">20260702.48</div>
+              <p class="stat-desc">CI/CD artifact ID identifier</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Last Deployment Time</span>
+              <div class="stat-val" id="last-deploy-val">4 hours ago</div>
+              <p class="stat-desc">GitHub Actions deploy trigger</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">API Response Time</span>
+              <div class="stat-val font-mono" id="latency-val">-- ms</div>
+              <p class="stat-desc">Average latency for routes</p>
+            </div>
+            <div class="stat-card glass-card">
+              <span class="stat-lbl">Active Connections</span>
+              <div class="stat-val font-mono" id="connections-val">--</div>
+              <p class="stat-desc">Current polling connections</p>
+            </div>
+          </div>
+
+          <!-- Monitoring Summary Panel -->
+          <div class="monitoring-panel-container">
+            <h3 class="panel-section-title">Operations Integrations Panel</h3>
+            <div class="monitoring-grid-6">
+              <div class="monitoring-badge-card" id="badge-card-cloudwatch">
+                <span class="badge-icon-wrap accent-cloudwatch"><i data-lucide="eye"></i></span>
+                <div class="badge-info">
+                  <div class="badge-name">CloudWatch</div>
+                  <div class="badge-status-lbl" id="badge-cloudwatch">Checking...</div>
+                </div>
+              </div>
+              <div class="monitoring-badge-card" id="badge-card-github-actions">
+                <span class="badge-icon-wrap accent-actions"><i data-lucide="play-circle"></i></span>
+                <div class="badge-info">
+                  <div class="badge-name">GitHub Actions</div>
+                  <div class="badge-status-lbl" id="badge-github-actions">Checking...</div>
+                </div>
+              </div>
+              <div class="monitoring-badge-card" id="badge-card-ec2">
+                <span class="badge-icon-wrap accent-ec2"><i data-lucide="server"></i></span>
+                <div class="badge-info">
+                  <div class="badge-name">AWS EC2</div>
+                  <div class="badge-status-lbl" id="badge-ec2">Checking...</div>
+                </div>
+              </div>
+              <div class="monitoring-badge-card" id="badge-card-s3">
+                <span class="badge-icon-wrap accent-s3"><i data-lucide="hard-drive"></i></span>
+                <div class="badge-info">
+                  <div class="badge-name">S3 Backups</div>
+                  <div class="badge-status-lbl" id="badge-s3">Checking...</div>
+                </div>
+              </div>
+              <div class="monitoring-badge-card" id="badge-card-nginx">
+                <span class="badge-icon-wrap accent-nginx"><i data-lucide="split"></i></span>
+                <div class="badge-info">
+                  <div class="badge-name">Nginx Proxy</div>
+                  <div class="badge-status-lbl" id="badge-nginx">Checking...</div>
+                </div>
+              </div>
+              <div class="monitoring-badge-card" id="badge-card-pm2">
+                <span class="badge-icon-wrap accent-node"><i data-lucide="terminal"></i></span>
+                <div class="badge-info">
+                  <div class="badge-name">PM2 Process</div>
+                  <div class="badge-status-lbl" id="badge-pm2">Checking...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: System Metrics -->
+        <section id="metrics" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">System Metrics</h2>
+              <p class="viewport-section-subtitle">Visual performance metrics measuring machine load, network throughput, and queue rates.</p>
+            </div>
+          </div>
+
+          <!-- Metric Charts Grid -->
+          <div class="charts-grid">
+            <div class="chart-card glass-card">
+              <div class="chart-header">
+                <span class="chart-title">CPU Usage</span>
+                <span class="chart-badge font-mono" id="cpu-chart-badge">--%</span>
+              </div>
+              <div class="chart-container-inner">
+                <canvas id="cpuChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card glass-card">
+              <div class="chart-header">
+                <span class="chart-title">Memory Usage</span>
+                <span class="chart-badge font-mono" id="mem-chart-badge">--%</span>
+              </div>
+              <div class="chart-container-inner">
+                <canvas id="memChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card glass-card">
+              <div class="chart-header">
+                <span class="chart-title">Disk Storage</span>
+                <span class="chart-badge font-mono" id="disk-chart-badge">42.4%</span>
+              </div>
+              <div class="chart-container-inner">
+                <canvas id="diskChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card glass-card">
+              <div class="chart-header">
+                <span class="chart-title">Network Traffic</span>
+                <span class="chart-badge font-mono" id="net-chart-badge">In: -- Mbps</span>
+              </div>
+              <div class="chart-container-inner">
+                <canvas id="netChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card glass-card">
+              <div class="chart-header">
+                <span class="chart-title">API Response Time (ms)</span>
+                <span class="chart-badge font-mono" id="rt-chart-badge">--ms</span>
+              </div>
+              <div class="chart-container-inner">
+                <canvas id="rtChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card glass-card">
+              <div class="chart-header">
+                <span class="chart-title">Requests Per Minute (RPM)</span>
+                <span class="chart-badge font-mono" id="rpm-chart-badge">-- rpm</span>
+              </div>
+              <div class="chart-container-inner">
+                <canvas id="rpmChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Infrastructure Diagram -->
+        <section id="infrastructure" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">Infrastructure Blueprint</h2>
+              <p class="viewport-section-subtitle">Interactive system architecture mappings. Hover over components to examine specifications.</p>
+            </div>
+          </div>
+
+          <div class="interactive-diagram-container glass-card">
+            
+            <!-- Live Tooltip display panel -->
+            <div class="diagram-tooltip-box" id="diagram-tooltip">
+              <div class="tooltip-header">
+                <i data-lucide="info" class="tooltip-info-icon"></i>
+                <span class="tooltip-node-name" id="tooltip-title">System Node</span>
+              </div>
+              <p class="tooltip-node-desc" id="tooltip-desc">Hover over any architecture card below to read the system specifications, configuration flags, and routing guidelines.</p>
+            </div>
+
+            <!-- Primary flow chain -->
+            <div class="diagram-flow-swimlane">
+              <span class="swimlane-lbl">HTTP Request & Execution Flow</span>
+              <div class="diagram-row">
+                <div class="diagram-node-card accent-user" data-node="user">
+                  <div class="node-icon"><i data-lucide="users"></i></div>
+                  <div class="node-name">Client User</div>
+                  <div class="node-meta">Browser Client</div>
+                </div>
+
+                <div class="diagram-node-arrow"><i data-lucide="arrow-right"></i></div>
+
+                <div class="diagram-node-card accent-internet" data-node="internet">
+                  <div class="node-icon"><i data-lucide="globe"></i></div>
+                  <div class="node-name">Internet Route</div>
+                  <div class="node-meta">DNS & Gateway</div>
+                </div>
+
+                <div class="diagram-node-arrow"><i data-lucide="arrow-right"></i></div>
+
+                <div class="diagram-node-card accent-nginx" data-node="nginx">
+                  <div class="node-icon"><i data-lucide="split"></i></div>
+                  <div class="node-name">Nginx Proxy</div>
+                  <div class="node-meta">Reverse Routing</div>
+                </div>
+
+                <div class="diagram-node-arrow"><i data-lucide="arrow-right"></i></div>
+
+                <div class="diagram-node-card accent-node" data-node="express">
+                  <div class="node-icon"><i data-lucide="terminal"></i></div>
+                  <div class="node-name">Express App</div>
+                  <div class="node-meta">Node REST APIs</div>
+                </div>
+
+                <div class="diagram-node-arrow"><i data-lucide="arrow-right"></i></div>
+
+                <div class="diagram-node-card accent-pm2" data-node="pm2">
+                  <div class="node-icon"><i data-lucide="cpu"></i></div>
+                  <div class="node-name">PM2 Manager</div>
+                  <div class="node-meta">Process Daemon</div>
+                </div>
+
+                <div class="diagram-node-arrow"><i data-lucide="arrow-right"></i></div>
+
+                <div class="diagram-node-card accent-ec2" data-node="ec2">
+                  <div class="node-icon"><i data-lucide="server"></i></div>
+                  <div class="node-name">AWS EC2</div>
+                  <div class="node-meta">Ubuntu VM</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Integrations row -->
+            <div class="diagram-flow-swimlane">
+              <span class="swimlane-lbl">Auxiliary DevOps Integrations</span>
+              <div class="diagram-row-aux">
+                <div class="diagram-node-card accent-github" data-node="github">
+                  <div class="node-icon"><i data-lucide="github"></i></div>
+                  <div class="node-name">GitHub Repos</div>
+                  <div class="node-meta">Source Control</div>
+                </div>
+                <div class="diagram-node-card accent-actions" data-node="github-actions">
+                  <div class="node-icon"><i data-lucide="play-circle"></i></div>
+                  <div class="node-name">GitHub Actions</div>
+                  <div class="node-meta">CI/CD Pipelines</div>
+                </div>
+                <div class="diagram-node-card accent-cloudwatch" data-node="cloudwatch">
+                  <div class="node-icon"><i data-lucide="eye"></i></div>
+                  <div class="node-name">CloudWatch</div>
+                  <div class="node-meta">AWS Monitoring</div>
+                </div>
+                <div class="diagram-node-card accent-s3" data-node="s3">
+                  <div class="node-icon"><i data-lucide="hard-drive"></i></div>
+                  <div class="node-name">Amazon S3</div>
+                  <div class="node-meta">Object Storage</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Section: Deployment History -->
+        <section id="deployments" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">Deployment Pipelines</h2>
+              <p class="viewport-section-subtitle">Active historical deployments and webhook triggers synchronized with GitHub.</p>
+            </div>
+          </div>
+
+          <!-- Deployments Table -->
+          <div class="table-container glass-card">
+            <table class="deployment-table">
+              <thead>
+                <tr>
+                  <th>Build ID</th>
+                  <th>Commit Hash</th>
+                  <th>Branch</th>
+                  <th>Status</th>
+                  <th>Deployment Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="font-mono text-accent font-semibold">DP-8234</td>
+                  <td class="font-mono">9a8b7c4</td>
+                  <td><span class="branch-pill">main</span></td>
+                  <td><span class="badge badge-success">Success</span></td>
+                  <td>2026-07-02 16:45:00 (UTC)</td>
+                </tr>
+                <tr>
+                  <td class="font-mono text-accent font-semibold">DP-8233</td>
+                  <td class="font-mono">a3b2c1d</td>
+                  <td><span class="branch-pill">main</span></td>
+                  <td><span class="badge badge-success">Success</span></td>
+                  <td>2026-07-02 12:20:00 (UTC)</td>
+                </tr>
+                <tr>
+                  <td class="font-mono text-accent font-semibold">DP-8232</td>
+                  <td class="font-mono">e4f5g6h</td>
+                  <td><span class="branch-pill">feature/metrics</span></td>
+                  <td><span class="badge badge-error">Failed</span></td>
+                  <td>2026-07-02 10:15:00 (UTC)</td>
+                </tr>
+                <tr>
+                  <td class="font-mono text-accent font-semibold">DP-8231</td>
+                  <td class="font-mono">d7e8f9a</td>
+                  <td><span class="branch-pill">main</span></td>
+                  <td><span class="badge badge-success">Success</span></td>
+                  <td>2026-07-01 19:30:00 (UTC)</td>
+                </tr>
+                <tr>
+                  <td class="font-mono text-accent font-semibold">DP-8230</td>
+                  <td class="font-mono">c3d4e5f</td>
+                  <td><span class="branch-pill">hotfix/s3-sync</span></td>
+                  <td><span class="badge badge-success">Success</span></td>
+                  <td>2026-06-30 08:14:00 (UTC)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section: Live Logs -->
+        <section id="logs" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">Live Application Logs</h2>
+              <p class="viewport-section-subtitle">Real-time system telemetry and web application stack console outputs.</p>
+            </div>
+            <div class="terminal-controls">
+              <span class="indicator-blink"></span>
+              <span class="font-mono text-secondary">FEED ACTIVE</span>
+            </div>
+          </div>
+
+          <!-- Terminal log box -->
+          <div class="terminal-wrapper glass-card">
+            <div class="terminal-bar">
+              <div class="terminal-circles">
+                <span class="circle circle-red"></span>
+                <span class="circle circle-yellow"></span>
+                <span class="circle circle-green"></span>
+              </div>
+              <div class="terminal-title">deploypilot-ops-daemon.log</div>
+              <div class="terminal-actions">
+                <button class="btn-terminal-clear" id="clear-logs-btn">Clear Logs</button>
+              </div>
+            </div>
+            <div class="terminal-content" id="log-terminal">
+              <!-- Logs appended dynamically via JavaScript -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: API Tester -->
+        <section id="api-tester" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">API Console Tester</h2>
+              <p class="viewport-section-subtitle">Interact with public routes and inspect latency times and JSON responses.</p>
+            </div>
+          </div>
+
+          <div class="api-tester-container glass-card">
+            <div class="tester-controls-bar">
+              <div class="tester-select-wrapper">
+                <span class="method-get">GET</span>
+                <select class="tester-select" id="api-endpoint-selector">
+                  <option value="/api">/api (Documentation)</option>
+                  <option value="/health">/health (Diagnostics)</option>
+                  <option value="/time">/time (Server Clock)</option>
+                  <option value="/api/system">/api/system (Live OS Metrics)</option>
+                  <option value="/api/metrics">/api/metrics (Performance)</option>
+                  <option value="/api/logs">/api/logs (Log Buffer)</option>
+                  <option value="/api/deployments">/api/deployments (History)</option>
+                  <option value="/api/integrations">/api/integrations (Real Status)</option>
+                  <option value="/api/system-info">/api/system-info (Legacy Metadata)</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" id="btn-run-test">
+                <i data-lucide="play" class="btn-icon-left"></i> Send Request
+              </button>
+            </div>
+
+            <div class="tester-results-container">
+              <div class="tester-metrics-bar">
+                <div class="t-metric">
+                  <span class="t-lbl">Status Code</span>
+                  <span class="t-val" id="tester-status-val">--</span>
+                </div>
+                <div class="t-metric">
+                  <span class="t-lbl">Response Time</span>
+                  <span class="t-val" id="tester-time-val">-- ms</span>
+                </div>
+                <div class="t-metric">
+                  <span class="t-lbl">Success Indicator</span>
+                  <span class="t-val" id="tester-indicator-val">
+                    <span class="indicator-placeholder">--</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="code-block-wrapper">
+                <div class="code-header">
+                  <span>RESPONSE PAYLOAD (JSON)</span>
+                  <button class="btn-copy" id="btn-copy-tester-payload">
+                    <i data-lucide="copy" class="btn-copy-icon"></i>
+                    <span class="btn-copy-text">Copy JSON</span>
+                  </button>
+                </div>
+                <pre class="code-content"><code class="language-json" id="tester-output-code">{
+  "message": "Click 'Send Request' to trigger Express routing and display JSON outputs here."
+}</code></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: System Information & Security -->
+        <div class="split-viewport-grid">
+          
+          <!-- System Information Section -->
+          <section id="system-info" class="viewport-section">
+            <div class="section-title-bar">
+              <div>
+                <h2 class="viewport-section-title">System Information</h2>
+                <p class="viewport-section-subtitle">Hardware details and environmental metadata resolved on node initialization.</p>
+              </div>
+            </div>
+
+            <div class="details-card glass-card">
+              <ul class="details-list">
+                <li>
+                  <span class="details-label">Node.js Version</span>
+                  <span class="details-value font-mono" id="node-ver-val">--</span>
+                </li>
+                <li>
+                  <span class="details-label">Express Version</span>
+                  <span class="details-value font-mono" id="express-ver-val">--</span>
+                </li>
+                <li>
+                  <span class="details-label">Host OS Platform</span>
+                  <span class="details-value text-capitalize" id="platform-val">--</span>
+                </li>
+                <li>
+                  <span class="details-label">Architecture</span>
+                  <span class="details-value font-mono" id="arch-val">--</span>
+                </li>
+                <li>
+                  <span class="details-label">Process ID (PID)</span>
+                  <span class="details-value font-mono" id="pid-val">--</span>
+                </li>
+                <li>
+                  <span class="details-label">System Timezone</span>
+                  <span class="details-value" id="timezone-val">--</span>
+                </li>
+                <li>
+                  <span class="details-label">Server Clock</span>
+                  <span class="details-value font-mono" id="server-clock-val">--</span>
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- Security Section -->
+          <section id="security" class="viewport-section">
+            <div class="section-title-bar">
+              <div>
+                <h2 class="viewport-section-title">Security & Compliance</h2>
+                <p class="viewport-section-subtitle">Security controls configured and verified against AWS audit lists.</p>
+              </div>
+            </div>
+
+            <div class="security-grid">
+              <div class="security-item-card">
+                <div class="sec-header">
+                  <i data-lucide="check-circle-2" class="sec-check-icon"></i>
+                  <span class="sec-name">HTTPS / TLS SSL</span>
+                </div>
+                <p class="sec-desc">A+ rating encryption in transit using Let's Encrypt certificates routed via Nginx proxy.</p>
+              </div>
+              <div class="security-item-card">
+                <div class="sec-header">
+                  <i data-lucide="check-circle-2" class="sec-check-icon"></i>
+                  <span class="sec-name">AWS IAM Roles</span>
+                  <span class="badge badge-success">Least Privilege</span>
+                </div>
+                <p class="sec-desc">VPC instances configured with specific policies restricted from root AWS operations.</p>
+              </div>
+              <div class="security-item-card">
+                <div class="sec-header">
+                  <i data-lucide="check-circle-2" class="sec-check-icon"></i>
+                  <span class="sec-name">Security Groups</span>
+                </div>
+                <p class="sec-desc">Inbound connection rules restricting non-HTTP access (only TCP 80/443 open to public).</p>
+              </div>
+              <div class="security-item-card">
+                <div class="sec-header">
+                  <i data-lucide="check-circle-2" class="sec-check-icon"></i>
+                  <span class="sec-name">VPC Firewall (UFW)</span>
+                </div>
+                <p class="sec-desc">Active OS level kernel firewalls routing standard internal reverse proxies.</p>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- Section: Load Tests -->
+        <section id="load-tests" class="viewport-section">
+          <div class="section-title-bar">
+            <div>
+              <h2 class="viewport-section-title">Performance & Load Benchmarks</h2>
+              <p class="viewport-section-subtitle">Performance response charts simulating intensive virtual user stress tests.</p>
+            </div>
+            <span class="badge badge-success font-mono font-semibold">100 Virtual Users Test</span>
+          </div>
+
+          <div class="load-test-layout">
+            <div class="stat-grid-8" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+              <div class="stat-card glass-card">
+                <span class="stat-lbl">Stress Group Size</span>
+                <div class="stat-val font-mono">100 VU</div>
+                <p class="stat-desc">Parallel request streams</p>
+              </div>
+              <div class="stat-card glass-card">
+                <span class="stat-lbl">Average Latency</span>
+                <div class="stat-val font-mono">22.4 ms</div>
+                <p class="stat-desc">Calculated HTTP roundtrip</p>
+              </div>
+              <div class="stat-card glass-card">
+                <span class="stat-lbl">95th Percentile</span>
+                <div class="stat-val font-mono">41.8 ms</div>
+                <p class="stat-desc">High boundary response</p>
+              </div>
+              <div class="stat-card glass-card">
+                <span class="stat-lbl">Max Response Time</span>
+                <div class="stat-val font-mono">118.0 ms</div>
+                <p class="stat-desc">Longest request latency</p>
+              </div>
+              <div class="stat-card glass-card">
+                <span class="stat-lbl">Throughput</span>
+                <div class="stat-val font-mono text-accent">1,452 req/s</div>
+                <p class="stat-desc">Requests processed per sec</p>
+              </div>
+              <div class="stat-card glass-card">
+                <span class="stat-lbl">Error Rate</span>
+                <div class="stat-val font-mono text-green">0.00%</div>
+                <p class="stat-desc">Failed HTTP socket streams</p>
+              </div>
+              <div class="stat-card glass-card" style="grid-column: span 2;">
+                <span class="stat-lbl">Compliance Rating</span>
+                <div class="stat-val text-green font-semibold">A+ SLO Compliant</div>
+                <p class="stat-desc">Meets 99.9% uptime latency target SLAs</p>
+              </div>
+            </div>
+
+            <!-- Load test timeline canvas -->
+            <div class="chart-card glass-card" style="padding: 2rem;">
+              <span class="chart-title" style="margin-bottom: 1.5rem; display: block;">Load Test Throughput Timeline (100 VU Stable Run)</span>
+              <div class="chart-container-inner" style="height: 250px;">
+                <canvas id="loadTestChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Footer inside Dashboard Viewport -->
+        <footer class="app-footer-inline">
+          <div class="footer-brand-small">
+            <i data-lucide="cpu" class="footer-logo-icon"></i>
+            <span>Deploy<span class="text-accent">Pilot</span> Cloud Console</span>
+          </div>
+          <p class="footer-text-small">
+            Operations center dashboard managed on Node.js, Express, AWS EC2, GitHub Actions CI/CD, and Amazon S3.
+          </p>
+        </footer>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Client JavaScript -->
+  <script src="js/app.js"></script>
+</body>
+</html>

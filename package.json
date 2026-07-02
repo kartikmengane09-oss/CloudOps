@@ -1,0 +1,18 @@
+{
+  "name": "deploypilot",
+  "version": "1.0.0",
+  "description": "DeployPilot modern landing page and dashboard.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "helmet": "^8.2.0",
+    "morgan": "^1.11.0"
+  }
+}
