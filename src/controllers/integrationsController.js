@@ -89,60 +89,178 @@ function checkGitHubActions() {
 }
 
 /**
- * AWS EC2: Probe the EC2 Instance Metadata Service (IMDS) v1 with a 300ms timeout.
- * This is the only reliable way to detect if we are running on an EC2 instance.
- * Returns a Promise.
+ * AWS EC2: Robust 3-stage detection strategy.
+ *
+ * Stage 1 – Environment variable signals (instant, no network):
+ *   AWS sets known env vars in EC2 user-data scripts, ECS tasks, and Lambda.
+ *
+ * Stage 2 – IMDSv2 (PUT → GET with token):
+ *   Required on instances where HttpTokens=required (enforced by AWS best-practice
+ *   and required for all new launches from 2024 onwards). A plain GET returns 401,
+ *   which the old code misread as "not EC2".
+ *
+ * Stage 3 – IMDSv1 plain GET fallback:
+ *   For older instances that still allow IMDSv1.
+ *
+ * Returns a Promise that always resolves (never rejects).
  */
 function checkEC2() {
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      resolve({
-        status: 'unknown',
-        label:  'Not on EC2',
-        detail: 'EC2 Instance Metadata Service (169.254.169.254) did not respond within 300ms. Likely running locally or on another provider.'
-      });
-    }, 300);
+  // ── Stage 1: Instant env-var signals ─────────────────────────────────────
+  const execEnv    = process.env.AWS_EXECUTION_ENV;          // set by ECS/Lambda
+  const ecsMeta    = process.env.ECS_CONTAINER_METADATA_URI; // ECS task
+  const ecsMetaV4  = process.env.ECS_CONTAINER_METADATA_URI_V4;
+  const instanceId = process.env.EC2_INSTANCE_ID;            // user-data may set this
+  const region     = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
 
-    const req = http.get(
-      { host: '169.254.169.254', path: '/latest/meta-data/', port: 80, timeout: 300 },
-      (res) => {
-        clearTimeout(timeout);
-        if (res.statusCode === 200) {
-          resolve({
-            status: 'ok',
-            label:  'Running',
-            detail: 'EC2 IMDS responded. This process is running on an AWS EC2 instance.'
-          });
-        } else {
-          resolve({
-            status: 'warn',
-            label:  'Unexpected Response',
-            detail: `EC2 IMDS replied with HTTP ${res.statusCode}.`
+  if (instanceId) {
+    return Promise.resolve({
+      status: 'ok',
+      label:  'Running',
+      detail: `EC2 detected via EC2_INSTANCE_ID env var. Instance: ${instanceId}${region ? ', Region: ' + region : ''}.`
+    });
+  }
+  if (ecsMeta || ecsMetaV4) {
+    return Promise.resolve({
+      status: 'ok',
+      label:  'Running (ECS)',
+      detail: `Running inside an ECS container task. Metadata URI: ${ecsMetaV4 || ecsMeta}`
+    });
+  }
+  if (execEnv && execEnv.startsWith('AWS_')) {
+    return Promise.resolve({
+      status: 'ok',
+      label:  'Running',
+      detail: `AWS execution environment detected: ${execEnv}.`
+    });
+  }
+
+  // ── Stage 2 & 3: Probe IMDS with IMDSv2 → IMDSv1 fallback ───────────────
+  const IMDS_HOST    = '169.254.169.254';
+  const IMDS_TIMEOUT = 500; // ms — generous enough for a local link-local address
+
+  /**
+   * Attempt IMDSv2: PUT /latest/api/token to obtain a session token,
+   * then GET /latest/meta-data/instance-id with that token.
+   * IMDSv2 is required on all instances with HttpTokens=required (the new default).
+   */
+  function tryIMDSv2() {
+    return new Promise((resolve) => {
+      const putReq = http.request(
+        {
+          method:  'PUT',
+          host:    IMDS_HOST,
+          path:    '/latest/api/token',
+          port:    80,
+          timeout: IMDS_TIMEOUT,
+          headers: { 'X-aws-ec2-metadata-token-ttl-seconds': '21600' }
+        },
+        (putRes) => {
+          let token = '';
+          putRes.on('data', (chunk) => { token += chunk.toString(); });
+          putRes.on('end', () => {
+            if (putRes.statusCode !== 200 || !token) {
+              return resolve(null); // escalate to IMDSv1 fallback
+            }
+            // Got a token — now fetch instance-id
+            const getReq = http.get(
+              {
+                host:    IMDS_HOST,
+                path:    '/latest/meta-data/instance-id',
+                port:    80,
+                timeout: IMDS_TIMEOUT,
+                headers: { 'X-aws-ec2-metadata-token': token.trim() }
+              },
+              (getRes) => {
+                let instanceId = '';
+                getRes.on('data', (c) => { instanceId += c.toString(); });
+                getRes.on('end', () => {
+                  if (getRes.statusCode === 200 && instanceId) {
+                    resolve({
+                      status: 'ok',
+                      label:  'Running',
+                      detail: `EC2 IMDSv2 confirmed. Instance ID: ${instanceId.trim()}${region ? ', Region: ' + region : ''}.`
+                    });
+                  } else {
+                    resolve(null);
+                  }
+                });
+              }
+            );
+            getReq.on('error', () => resolve(null));
+            getReq.on('timeout', () => { getReq.destroy(); resolve(null); });
           });
         }
-        res.resume(); // consume response body
-      }
-    );
+      );
+      putReq.on('error', () => resolve(null));
+      putReq.on('timeout', () => { putReq.destroy(); resolve(null); });
+      putReq.end();
+    });
+  }
 
-    req.on('error', () => {
-      clearTimeout(timeout);
-      resolve({
-        status: 'unknown',
-        label:  'Not on EC2',
-        detail: 'EC2 Instance Metadata Service unreachable. Running outside AWS EC2.'
+  /**
+   * Fallback: IMDSv1 plain GET (for older instances where HttpTokens=optional).
+   * A 401 response here means IMDSv2 is required but our PUT somehow failed —
+   * we still flag it as EC2 since the endpoint is reachable.
+   */
+  function tryIMDSv1() {
+    return new Promise((resolve) => {
+      const hardTimeout = setTimeout(() => {
+        resolve({
+          status:  'unknown',
+          label:   'Not Detected',
+          detail:  `IMDS at ${IMDS_HOST} did not respond within ${IMDS_TIMEOUT}ms. Running locally or on a non-AWS provider.`
+        });
+      }, IMDS_TIMEOUT + 100);
+
+      const req = http.get(
+        { host: IMDS_HOST, path: '/latest/meta-data/', port: 80, timeout: IMDS_TIMEOUT },
+        (res) => {
+          clearTimeout(hardTimeout);
+          res.resume();
+          if (res.statusCode === 200) {
+            resolve({
+              status: 'ok',
+              label:  'Running',
+              detail: `EC2 IMDSv1 confirmed. IMDS responded 200.${region ? ' Region: ' + region : ''}`
+            });
+          } else if (res.statusCode === 401) {
+            // 401 means IMDSv2 is enforced but our PUT failed — still on EC2
+            resolve({
+              status: 'warn',
+              label:  'Running (IMDSv2 only)',
+              detail: `EC2 IMDS reachable but IMDSv2 is required (HTTP 401 on IMDSv1). Instance is on EC2.${region ? ' Region: ' + region : ''}`
+            });
+          } else {
+            resolve({
+              status:  'unknown',
+              label:   'Not Detected',
+              detail:  `IMDS returned unexpected HTTP ${res.statusCode}. Cannot confirm EC2.`
+            });
+          }
+        }
+      );
+      req.on('error', () => {
+        clearTimeout(hardTimeout);
+        resolve({
+          status:  'unknown',
+          label:   'Not Detected',
+          detail:  'IMDS unreachable. Not running on AWS EC2, or IMDS is disabled on this instance.'
+        });
+      });
+      req.on('timeout', () => {
+        clearTimeout(hardTimeout);
+        req.destroy();
+        resolve({
+          status:  'unknown',
+          label:   'Not Detected',
+          detail:  `IMDS timed out after ${IMDS_TIMEOUT}ms. Running outside AWS EC2.`
+        });
       });
     });
+  }
 
-    req.on('timeout', () => {
-      clearTimeout(timeout);
-      req.destroy();
-      resolve({
-        status: 'unknown',
-        label:  'Not on EC2',
-        detail: 'EC2 IMDS timed out. Not running on AWS EC2.'
-      });
-    });
-  });
+  // Run IMDSv2 first; if it resolves null (failed), fall back to IMDSv1
+  return tryIMDSv2().then((result) => result !== null ? result : tryIMDSv1());
 }
 
 /**
@@ -259,24 +377,40 @@ const STATUS_CSS = {
  * GET /api/integrations
  */
 async function getIntegrations(req, res) {
-  // Parallel checks (EC2 is async; rest are sync)
-  const [ec2Result] = await Promise.all([checkEC2()]);
+  // Run all checks — EC2 is async (IMDS probe); rest are sync
+  const [
+    cwResult,
+    ghResult,
+    ec2Result,
+    s3Result,
+    nginxResult,
+    pm2Result
+  ] = await Promise.all([
+    Promise.resolve(checkCloudWatch()),
+    Promise.resolve(checkGitHubActions()),
+    checkEC2(),
+    Promise.resolve(checkS3()),
+    Promise.resolve(checkNginx(req)),
+    Promise.resolve(checkPM2())
+  ]);
+
+  const addCss = (r) => ({ ...r, css: STATUS_CSS[r.status] || 'status-unknown' });
 
   const integrations = {
-    cloudwatch:     { ...checkCloudWatch(),    css: STATUS_CSS[checkCloudWatch().status] },
-    github_actions: { ...checkGitHubActions(), css: STATUS_CSS[checkGitHubActions().status] },
-    ec2:            { ...ec2Result,            css: STATUS_CSS[ec2Result.status] },
-    s3:             { ...checkS3(),            css: STATUS_CSS[checkS3().status] },
-    nginx:          { ...checkNginx(req),      css: STATUS_CSS[checkNginx(req).status] },
-    pm2:            { ...checkPM2(),           css: STATUS_CSS[checkPM2().status] }
+    cloudwatch:     addCss(cwResult),
+    github_actions: addCss(ghResult),
+    ec2:            addCss(ec2Result),
+    s3:             addCss(s3Result),
+    nginx:          addCss(nginxResult),
+    pm2:            addCss(pm2Result)
   };
 
   // Compute overall health
   const statuses = Object.values(integrations).map(i => i.status);
   const overallStatus =
-    statuses.every(s => s === 'ok')     ? 'all_ok' :
-    statuses.some(s => s === 'error')   ? 'degraded' :
-    statuses.some(s => s === 'warn')    ? 'partial' :
+    statuses.every(s => s === 'ok')   ? 'all_ok'  :
+    statuses.some(s => s === 'error') ? 'degraded' :
+    statuses.some(s => s === 'warn')  ? 'partial'  :
     'unknown';
 
   res.json({
@@ -285,8 +419,8 @@ async function getIntegrations(req, res) {
     integrations,
     // Reserved for CloudWatch custom metric emission
     cloudwatch: {
-      enabled:   false,
-      namespace: 'DeployPilot/Integrations',
+      enabled:    false,
+      namespace:  'DeployPilot/Integrations',
       dimensions: []
     }
   });
