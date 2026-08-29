@@ -16,6 +16,40 @@ const app = express();
 // 1. Parse JSON and URL-encoded bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(
+  helmet({
+    hsts: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+          "'unsafe-inline'"
+        ],
+        styleSrc: [
+          "'self'",
+          "https://fonts.googleapis.com",
+          "'unsafe-inline'"
+        ],
+        fontSrc: [
+          "'self'",
+          "https://fonts.gstatic.com"
+        ],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://unpkg.com"
+        ],
+        connectSrc: ["'self'"],
+
+        // IMPORTANT: this must use the literal CSP directive name
+        "upgrade-insecure-requests": null
+      }
+    }
+  })
+);
 
 // 2. Request Logging via Morgan (console) + Log Buffer capture (Live Logs terminal)
 app.use(requestLogger);
@@ -26,18 +60,6 @@ app.use(morgan(logFormat, { stream: logStream }));
 app.use(compression());
 
 // 4. Security Headers (Helmet) with customized CSP to allow Lucide and Chart.js CDNs
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://unpkg.com", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
-      styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://unpkg.com"],
-      connectSrc: ["'self'"]
-    }
-  }
-}));
 
 // 5. CORS configuration with dynamic environment parsing
 app.use(cors({
