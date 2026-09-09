@@ -237,4 +237,5 @@ jobs:
             git pull origin main
             npm install --only=production
             pm2 reload deploypilot
+            CI/CD deployment test
 ```
