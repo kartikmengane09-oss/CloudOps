@@ -267,7 +267,6 @@ function checkEC2() {
 /**
  * S3 Backups: Check if S3 bucket and credentials are configured.
  */
-function checkS3() {
   async function checkS3() {
   const bucket =
     process.env.S3_BUCKET ||
@@ -303,7 +302,7 @@ function checkS3() {
     };
   }
  }
-}
+
 
 /**
  * Nginx Proxy: Detect if requests are arriving through Nginx.
