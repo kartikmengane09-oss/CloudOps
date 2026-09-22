@@ -18,6 +18,7 @@
 
 const http  = require('http');
 const https = require('https');
+const {S3Client,HeadBucketCommand} = require('@aws-sdk/client-s3');
 
 // ── Individual check functions ─────────────────────────────────────────────
 
@@ -267,29 +268,41 @@ function checkEC2() {
  * S3 Backups: Check if S3 bucket and credentials are configured.
  */
 function checkS3() {
-  const bucket = process.env.S3_BUCKET || process.env.AWS_S3_BUCKET;
-  const keyId  = process.env.AWS_ACCESS_KEY_ID;
-  const secret = process.env.AWS_SECRET_ACCESS_KEY;
+  async function checkS3() {
+  const bucket =
+    process.env.S3_BUCKET ||
+    process.env.AWS_S3_BUCKET ||
+    'cloudops-deploypilot-bucket';
 
-  if (!bucket) {
+  const region =
+    process.env.AWS_REGION ||
+    process.env.AWS_DEFAULT_REGION ||
+    'eu-north-1';
+
+  try {
+    const s3 = new S3Client({
+      region
+    });
+
+    await s3.send(
+      new HeadBucketCommand({
+        Bucket: bucket
+      })
+    );
+
     return {
-      status: 'unknown',
-      label:  'Not Configured',
-      detail: 'S3_BUCKET is not set. No S3 backup destination configured.'
+      status: 'ok',
+      label: 'Connected',
+      detail: `Bucket: ${bucket}. S3 is reachable using AWS credentials.`
+    };
+  } catch (err) {
+    return {
+      status: 'error',
+      label: 'Unavailable',
+      detail: `Unable to access bucket "${bucket}": ${err.message}`
     };
   }
-  if (!keyId || !secret) {
-    return {
-      status: 'warn',
-      label:  'No Credentials',
-      detail: `Bucket "${bucket}" is set but AWS credentials are missing.`
-    };
-  }
-  return {
-    status: 'ok',
-    label:  'Configured',
-    detail: `Bucket: ${bucket}. Credentials present.`
-  };
+ }
 }
 
 /**
