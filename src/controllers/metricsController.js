@@ -17,7 +17,7 @@
  */
 
 const os = require('os');
-
+const { getSystemMetrics } = require('../services/cloudwatchService');
 /**
  * Simple monotonic request counter incremented by the request counting
  * middleware wired in routes/api.js.
@@ -62,7 +62,7 @@ function loadAvgToCpuPct() {
 /**
  * GET /api/metrics
  */
-function getMetrics(req, res) {
+async function getMetrics(req, res) {
   const memTotal   = os.totalmem();
   const memFree    = os.freemem();
   const memUsedPct = parseFloat((((memTotal - memFree) / memTotal) * 100).toFixed(1));
@@ -70,6 +70,13 @@ function getMetrics(req, res) {
   const uptimeSec  = Math.round(process.uptime());
   const cpuPct     = loadAvgToCpuPct();
   const rpm        = computeRpm();
+  let cloudwatchMetrics = null;
+
+try {
+  cloudwatchMetrics = await getSystemMetrics();
+} catch (err) {
+  console.error('[CloudWatch] Failed to retrieve metrics:', err.message);
+}
 
   // Derive stable network estimates from process RSS growth rate
   // (a proxy for I/O activity; deterministic, no random)
@@ -88,7 +95,7 @@ function getMetrics(req, res) {
     // Core metrics
     cpu:                   cpuPct,
     memory:                memUsedPct,
-    disk:                  42.4,   // static — disk I/O requires native bindings or exec
+    disk:                  cloudwatchMetrics?.disk ?? null,
     active_connections:    activeConnections,
     response_time_ms:      responseTimeMs,
     requests_per_minute:   rpm,
@@ -118,10 +125,15 @@ function getMetrics(req, res) {
 
     // Reserved for CloudWatch integration
     cloudwatch: {
-      enabled:    false,
-      namespace:  'DeployPilot/Metrics',
-      dimensions: []
+  enabled: cloudwatchMetrics !== null,
+  namespace: 'DeployPilot/System',
+  dimensions: [
+    {
+      Name: 'InstanceId',
+      Value: process.env.EC2_INSTANCE_ID || 'i-0efcf9ec0be1cadc9'
     }
+  ]
+}
   };
 
   res.json(data);
